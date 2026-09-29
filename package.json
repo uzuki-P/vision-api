@@ -4,6 +4,27 @@
   "type": "module",
   "scripts": {
     "start": "bun run server.ts",
-    "dev": "bun --watch run server.ts"
+    "dev": "bun --watch run server.ts",
+    "web": "bun run web:build && bun run web.ts",
+    "web:build": "vite build",
+    "web:dev": "vite",
+    "check": "tsc --noEmit && vite build",
+    "test": "bun test",
+    "format": "prettier --write server.ts web.ts vite.config.ts src test web/src web/index.html tsconfig.json package.json",
+    "format:check": "prettier --check server.ts web.ts vite.config.ts src test web/src web/index.html tsconfig.json package.json"
+  },
+  "dependencies": {
+    "@solidjs/web": "2.0.0-rc.11",
+    "@t3-oss/env-core": "0.13.11",
+    "effect": "4.0.0-rc.118",
+    "solid-js": "2.0.0-rc.11",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@solidjs/vite-plugin": "3.0.0-next.46",
+    "@types/bun": "^1.4.2",
+    "prettier": "3.9.9",
+    "typescript": "^7.0.2",
+    "vite": "8.3.1"
   }
 }
