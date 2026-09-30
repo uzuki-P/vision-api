@@ -17,7 +17,9 @@ export type ScanReply = {
     reasoning_effort: string | null;
     token_usage: {
       input_tokens?: number;
+      cached_input_tokens?: number;
       output_tokens?: number;
+      reasoning_output_tokens?: number;
       total_tokens?: number;
     } | null;
   };

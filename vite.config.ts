@@ -14,6 +14,8 @@ export default defineConfig(({ mode }) => {
       host: "127.0.0.1",
       port: env.WEB_PORT,
       strictPort: true,
+      // Tailnet dev routes such as vision-api-preview.ts.uzuki-p.my.id.
+      allowedHosts: [".ts.uzuki-p.my.id"],
       proxy: {
         "/api": {
           target: `http://127.0.0.1:${env.PORT}`,

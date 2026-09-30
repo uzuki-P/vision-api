@@ -37,7 +37,7 @@ Codex is a shell-capable agent CLI. Its read-only sandbox prevents writes, but i
 
 ## Test playground
 
-`bun run web:dev` starts the Solid 2 RC test UI on `http://127.0.0.1:$WEB_PORT` (default 27182). Vite proxies `/api/*` to the API on `$PORT`, attaching the `.env` API token when the page's API key field is empty. `bun run web` builds the UI and serves the files with the same API proxy. Scans use the job endpoint and poll every three seconds. A page reload resumes polling the current job. Cancel stops polling; the submitted job continues running. Publish it with a named dev route for tailnet access:
+`bun run web:dev` starts the Solid 2 RC test UI on `http://127.0.0.1:$WEB_PORT` (default 27182). Vite proxies `/api/*` to the API on `$PORT`, attaching the `.env` API token when the page's API key field is empty. `bun run web` builds the UI and serves the files with the same API proxy. Scans use the job endpoint and poll every three seconds. A page reload resumes polling the current job. Stop polling ends the page's checks; the submitted job continues running. Each run stays in the session history with its image thumbnail, model, and result, so you can compare models on the same image. The history clears on reload. Publish it with a named dev route for tailnet access:
 
 ```sh
 cd ~/docker/dev-router && just specific vision-api-preview 27182
@@ -71,7 +71,7 @@ curl "https://vision-api.ts.uzuki-p.my.id/v1/jobs/JOB_ID" \
 
 The scan pipeline uses Effect v4 RC. Both endpoints share the same JSON validation and provider error handling. Effect releases the temporary image directory after each provider attempt, including failures.
 
-The API entry point is `server.ts`. HTTP routes and authentication live in `src/http.ts`; `src/input.ts` validates uploads; `src/jobs.ts` stores and schedules jobs. `src/scan.ts` runs the shared Effect workflow. `src/providers.ts` contains the OpenCode and Codex adapters, while `src/cli.ts` handles subprocess limits. `src/env.ts` validates server settings at startup with t3-env and Zod; `src/web-env.ts` validates the playground ports and optional token. The Solid playground lives under `web/`. Its model, image, result, and request log components are in `web/src/components/`, and `web/src/useScanJob.ts` owns submission and polling.
+The API entry point is `server.ts`. HTTP routes and authentication live in `src/http.ts`; `src/input.ts` validates uploads; `src/jobs.ts` stores and schedules jobs. `src/scan.ts` runs the shared Effect workflow. `src/providers.ts` contains the OpenCode and Codex adapters, while `src/cli.ts` handles subprocess limits. `src/env.ts` validates server settings at startup with t3-env and Zod; `src/web-env.ts` validates the playground ports and optional token. The Solid playground lives under `web/`. Its model, image, result, history, and request log components are in `web/src/components/`, and `web/src/useScanJob.ts` owns submission, polling, and the run history.
 
 Run `bun run check` for Oxlint, TypeScript, and the web build, `bun test` for the slow job and startup validation tests, and `bun run format:check` for formatting. `bun run lint` runs Oxlint's default correctness rules and fails on warnings. `bun run lint:fix` applies safe lint fixes. The shared configuration is `.oxlintrc.json`.
 

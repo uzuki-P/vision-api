@@ -112,72 +112,90 @@ export function ModelControls(props: {
   });
 
   return (
-    <>
-      <label for="provider">
-        <span class="step">01</span>
-        <span class="name">Provider</span>
-      </label>
-      <select
-        id="provider"
-        name="provider"
-        value={provider()}
-        onChange={(event) => changeProvider(event.currentTarget.value)}
-      >
-        <For each={providers()}>
-          {(item) => <option value={item}>{item}</option>}
-        </For>
-      </select>
-      <label for="model">
-        <span class="step">02</span>
-        <span class="name">Model</span>
-      </label>
-      <div class="models-line">
-        <select
-          id="model"
-          name="model"
-          value={model()}
-          onChange={(event) => changeModel(event.currentTarget.value)}
-        >
-          <option value="">provider default</option>
-          <For each={groups()}>
-            {([group, items]) => (
-              <optgroup label={group}>
-                <For each={items}>
-                  {(item) => (
-                    <option value={item.id}>{item.label || item.id}</option>
-                  )}
-                </For>
-              </optgroup>
+    <div class="model-grid">
+      <fieldset class="field provider-field">
+        <legend class="label">Provider</legend>
+        <div class="segmented">
+          <For each={providers()}>
+            {(item) => (
+              <label>
+                <input
+                  type="radio"
+                  name="provider"
+                  value={item}
+                  checked={provider() === item}
+                  onChange={() => changeProvider(item)}
+                />
+                <span>{item}</span>
+              </label>
             )}
           </For>
-        </select>
-        <button
-          type="button"
-          class="icon-btn small"
-          disabled={refreshing()}
-          onClick={() => void loadModels(provider(), model(), effort())}
-          title="Reload models"
-          aria-label="Reload models"
-        >
-          ↻
-        </button>
+        </div>
+      </fieldset>
+      <div class="field model-field">
+        <label class="label" for="model">
+          Model
+        </label>
+        <div class="with-action">
+          <select
+            id="model"
+            name="model"
+            value={model()}
+            onChange={(event) => changeModel(event.currentTarget.value)}
+          >
+            <option value="">Provider default</option>
+            <For each={groups()}>
+              {([group, items]) => (
+                <optgroup label={group}>
+                  <For each={items}>
+                    {(item) => (
+                      <option value={item.id}>{item.label || item.id}</option>
+                    )}
+                  </For>
+                </optgroup>
+              )}
+            </For>
+          </select>
+          <button
+            type="button"
+            class="icon-btn"
+            disabled={refreshing()}
+            onClick={() => void loadModels(provider(), model(), effort())}
+            title="Reload models"
+            aria-label="Reload models"
+          >
+            <svg
+              class={refreshing() ? "spin" : ""}
+              viewBox="0 0 16 16"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              aria-hidden="true"
+            >
+              <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3" />
+            </svg>
+          </button>
+        </div>
       </div>
-      <label for="effort">
-        <span class="step">03</span>
-        <span class="name">Reasoning effort</span>
-      </label>
-      <select
-        id="effort"
-        name="reasoning_effort"
-        disabled={efforts().length === 0}
-        value={effort()}
-        onChange={(event) => changeEffort(event.currentTarget.value)}
-      >
-        <option value="">provider default</option>
-        <For each={efforts()}>
-          {(item) => <option value={item}>{item}</option>}
-        </For>
-      </select>
-    </>
+      <div class="field effort-field">
+        <label class="label" for="effort">
+          Effort
+        </label>
+        <select
+          id="effort"
+          name="reasoning_effort"
+          disabled={efforts().length === 0}
+          value={effort()}
+          onChange={(event) => changeEffort(event.currentTarget.value)}
+        >
+          <option value="">Default</option>
+          <For each={efforts()}>
+            {(item) => <option value={item}>{item}</option>}
+          </For>
+        </select>
+      </div>
+    </div>
   );
 }

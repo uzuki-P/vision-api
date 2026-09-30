@@ -1,4 +1,5 @@
 import { Show, createSignal, onSettled } from "solid-js";
+import { formatBytes } from "../format";
 
 const acceptedTypes = new Set([
   "image/png",
@@ -8,13 +9,8 @@ const acceptedTypes = new Set([
 ]);
 const maxBytes = 12 * 1024 * 1024;
 
-function formatBytes(size: number) {
-  return size >= 1048576
-    ? `${(size / 1048576).toFixed(1)} MB`
-    : `${Math.max(1, Math.round(size / 1024))} KB`;
-}
-
 export function ImagePicker(props: {
+  scanning: boolean;
   onFileChange: (file: File | null) => void;
   onError: (message: string) => void;
 }) {
@@ -48,7 +44,7 @@ export function ImagePicker(props: {
     const probe = new Image();
     probe.onload = () => {
       if (imageUrl() === url)
-        setDimensions(`${probe.naturalWidth}×${probe.naturalHeight}`);
+        setDimensions(`${probe.naturalWidth} × ${probe.naturalHeight}`);
     };
     probe.src = url;
   }
@@ -112,79 +108,97 @@ export function ImagePicker(props: {
   });
 
   return (
-    <>
-      <label for="image-input">
-        <span class="name">Image</span>
-      </label>
+    <section class="stage-wrap" aria-label="Image">
+      <input
+        ref={(element) => {
+          input = element;
+        }}
+        class="visually-hidden"
+        type="file"
+        id="image-input"
+        name="image"
+        tabindex="-1"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        onChange={(event) => selectImage(event.currentTarget.files?.[0])}
+      />
       <div
-        class={`viewfinder ${dragging() ? "drag" : ""}`}
-        onClick={() => input.click()}
+        class={{
+          stage: true,
+          drag: dragging(),
+          scanning: props.scanning,
+          filled: !!file(),
+        }}
       >
-        <input
-          ref={(element) => {
-            input = element;
-          }}
-          type="file"
-          id="image-input"
-          name="image"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          onChange={(event) => selectImage(event.currentTarget.files?.[0])}
-        />
-        <span class="tick tl" />
-        <span class="tick tr" />
-        <span class="tick bl" />
-        <span class="tick br" />
-        <Show when={!file()}>
-          <div class="hint">
-            <b>Drop an image anywhere</b>
-            <span class="sub">
-              or click to browse · paste works too · PNG JPEG WebP GIF · 12 MB
-            </span>
-          </div>
-        </Show>
-        <Show when={file()}>
-          <div class="preview" style={{ display: "block" }}>
-            <img
-              src={imageUrl()}
-              alt="Selected image preview"
-              title="Click to enlarge"
-              onClick={(event) => {
-                event.stopPropagation();
-                dialog.showModal();
-              }}
-            />
-            <button
-              type="button"
-              class="expand"
-              title="Enlarge"
-              aria-label="Enlarge preview"
-              onClick={(event) => {
-                event.stopPropagation();
-                dialog.showModal();
-              }}
-            >
-              ⤢
-            </button>
-            <button
-              type="button"
-              class="remove"
-              onClick={(event) => {
-                event.stopPropagation();
-                clearImage();
-              }}
-            >
-              remove
-            </button>
-            <div class="meta">
-              <span>{file()?.name || "pasted image"}</span>
-              <span>{formatBytes(file()!.size)}</span>
-              <span>{dimensions()}</span>
+        <span class="bracket tl" />
+        <span class="bracket tr" />
+        <span class="bracket bl" />
+        <span class="bracket br" />
+        <Show
+          when={file()}
+          fallback={
+            <div class="stage-empty" onClick={() => input.click()}>
+              <p class="stage-title">Drop an image here</p>
+              <p class="stage-sub">
+                or paste from the clipboard, or{" "}
+                <button
+                  type="button"
+                  class="link-btn"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    input.click();
+                  }}
+                >
+                  choose a file
+                </button>
+              </p>
+              <p class="stage-fine">PNG, JPEG, WebP, or GIF up to 12 MB</p>
             </div>
-          </div>
+          }
+        >
+          <button
+            type="button"
+            class="frame"
+            title="Enlarge"
+            aria-label="Enlarge image"
+            onClick={() => dialog.showModal()}
+          >
+            <img src={imageUrl()} alt="" />
+            <span class="scan" aria-hidden="true" />
+          </button>
+          <Show when={dimensions()}>
+            <span class="dims" aria-hidden="true">
+              {dimensions()}
+            </span>
+          </Show>
         </Show>
       </div>
+      <Show when={file()}>
+        <div class="stage-bar">
+          <span class="file-name" title={file()?.name}>
+            {file()?.name || "pasted image"}
+          </span>
+          <span class="file-size">{formatBytes(file()!.size)}</span>
+          <span class="spacer" />
+          <button
+            type="button"
+            class="ghost-btn"
+            disabled={props.scanning}
+            onClick={() => input.click()}
+          >
+            Replace
+          </button>
+          <button
+            type="button"
+            class="ghost-btn danger"
+            disabled={props.scanning}
+            onClick={clearImage}
+          >
+            Remove
+          </button>
+        </div>
+      </Show>
       <dialog
-        id="preview-dialog"
+        class="viewer"
         ref={(element) => {
           dialog = element;
         }}
@@ -192,34 +206,38 @@ export function ImagePicker(props: {
           if (event.target === dialog) dialog.close();
         }}
       >
-        <div class="dialog-bar">
-          <span class="dialog-title">{file()?.name || "pasted image"}</span>
+        <div class="viewer-bar">
+          <span class="viewer-title">{file()?.name || "pasted image"}</span>
           <span class="spacer" />
           <button
             type="button"
-            class="icon-btn small"
+            class="icon-btn"
             onClick={() => dialog.close()}
             aria-label="Close preview"
           >
-            ×
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path
+                d="M3 3l10 10M13 3L3 13"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
+            </svg>
           </button>
         </div>
-        <img id="dialog-img" src={imageUrl()} alt="Enlarged image preview" />
-        <div class="dialog-meta">
-          <span class="k">name</span>
-          <span class="v">{file()?.name}</span>
-          <span class="k">type</span>
-          <span class="v">{file()?.type}</span>
-          <span class="k">size</span>
-          <span class="v">
+        <img class="viewer-img" src={imageUrl()} alt="Selected image" />
+        <dl class="viewer-meta">
+          <dt>type</dt>
+          <dd>{file()?.type}</dd>
+          <dt>size</dt>
+          <dd>
             {file()
               ? `${formatBytes(file()!.size)} (${file()!.size.toLocaleString("en-US")} bytes)`
               : ""}
-          </span>
-          <span class="k">dimensions</span>
-          <span class="v">{dimensions() || "loading…"}</span>
-        </div>
+          </dd>
+          <dt>pixels</dt>
+          <dd>{dimensions() || "loading…"}</dd>
+        </dl>
       </dialog>
-    </>
+    </section>
   );
 }

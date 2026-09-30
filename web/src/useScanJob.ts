@@ -1,140 +1,229 @@
 import { createSignal, onSettled } from "solid-js";
-import { delay, type JobReply, type ScanReply, type createApi } from "./api";
+import { delay, type ScanReply, type createApi } from "./api";
 
 const jobStorageKey = "vision-bench-job";
+const historyLimit = 20;
+const jobIdPattern = /^[0-9a-f-]{36}$/;
 type Api = ReturnType<typeof createApi>;
-type Badge = { kind: string; text: string };
+
+export type RunPhase =
+  "submitting" | "queued" | "running" | "succeeded" | "failed" | "stopped";
+export type RunSettings = { provider: string; model: string; effort: string };
+export type Run = {
+  id: string;
+  jobId: string;
+  phase: RunPhase;
+  startedAt: number;
+  durationMs: number | null;
+  instruction: string;
+  settings: RunSettings;
+  image: { url: string; name: string } | null;
+  reply: ScanReply | null;
+  error: { code: string; message: string } | null;
+};
+export type RunRequest = {
+  form: FormData;
+  instruction: string;
+  settings: RunSettings;
+  image: File;
+};
+type SavedJob = {
+  jobId: string;
+  startedAt: number;
+  instruction: string;
+  settings: RunSettings;
+};
+
+export function isActive(run: Run) {
+  return (
+    run.phase === "submitting" ||
+    run.phase === "queued" ||
+    run.phase === "running"
+  );
+}
+
+function readSavedJob(): SavedJob | null {
+  const raw = sessionStorage.getItem(jobStorageKey);
+  if (!raw) return null;
+  // Older builds stored the bare job ID.
+  if (jobIdPattern.test(raw))
+    return {
+      jobId: raw,
+      startedAt: Date.now(),
+      instruction: "",
+      settings: { provider: "", model: "", effort: "" },
+    };
+  try {
+    const saved = JSON.parse(raw) as SavedJob;
+    return jobIdPattern.test(saved.jobId) ? saved : null;
+  } catch {
+    return null;
+  }
+}
 
 export function useScanJob(api: Api) {
+  const [runs, setRuns] = createSignal<Run[]>([]);
   const [busy, setBusy] = createSignal(false);
-  const [elapsed, setElapsed] = createSignal("");
-  const [badge, setBadge] = createSignal<Badge>({ kind: "", text: "idle" });
-  const [output, setOutput] = createSignal(
-    "Send a request to see the model's response.",
-  );
-  const [chips, setChips] = createSignal<Array<[string, string]>>([]);
-  const [activeJob, setActiveJob] = createSignal("");
+  const [now, setNow] = createSignal(Date.now());
+  // Plain mirror of `runs` so handlers never read a signal mid-batch.
+  let list: Run[] = [];
   let controller: AbortController | null = null;
-  let timer: ReturnType<typeof setInterval> | undefined;
+  let clock: ReturnType<typeof setInterval> | undefined;
 
-  function startTimer(started: number) {
-    setElapsed("0.0s");
-    timer = setInterval(
-      () => setElapsed(`${((performance.now() - started) / 1000).toFixed(1)}s`),
-      100,
-    );
+  function commit(next: Run[]) {
+    list = next;
+    setRuns(next);
   }
-  function stopTimer() {
-    if (timer) clearInterval(timer);
-    timer = undefined;
-    setElapsed("");
+  function update(id: string, patch: Partial<Run>) {
+    commit(list.map((run) => (run.id === id ? { ...run, ...patch } : run)));
   }
-  function showResult(reply: ScanReply, started: number) {
-    setBadge({
-      kind: "ok",
-      text: `done · ${((performance.now() - started) / 1000).toFixed(1)}s`,
+  function add(run: Run) {
+    const next = [run, ...list];
+    for (const old of next.slice(historyLimit))
+      if (old.image) URL.revokeObjectURL(old.image.url);
+    commit(next.slice(0, historyLimit));
+  }
+  function settle(id: string, patch: Partial<Run>) {
+    sessionStorage.removeItem(jobStorageKey);
+    const run = list.find((item) => item.id === id);
+    update(id, {
+      ...patch,
+      durationMs: run ? Date.now() - run.startedAt : null,
     });
-    const meta = reply._metadata;
-    const rows: Array<[string, string]> = [
-      ["provider", meta.provider || "?"],
-      ["model", meta.model || "?"],
-    ];
-    if (meta.reasoning_effort) rows.push(["effort", meta.reasoning_effort]);
-    if (meta.token_usage) {
-      rows.push([
-        "tokens",
-        `${meta.token_usage.input_tokens ?? "?"} in / ${meta.token_usage.output_tokens ?? "?"} out`,
-      ]);
-      if (meta.token_usage.total_tokens)
-        rows.push(["total", String(meta.token_usage.total_tokens)]);
-    }
-    setChips(rows);
-    setOutput(JSON.stringify(reply, null, 2));
   }
-  async function pollJob(id: string, signal: AbortSignal, started: number) {
-    setActiveJob(id);
-    sessionStorage.setItem(jobStorageKey, id);
-    setOutput(`Job ${id} submitted. Waiting for result…`);
+
+  async function poll(id: string, jobId: string, signal: AbortSignal) {
     for (;;) {
       await delay(3000, signal);
-      const job: JobReply = await api.job(id, signal);
+      const job = await api.job(jobId, signal);
       if (job.status === "succeeded") {
-        sessionStorage.removeItem(jobStorageKey);
-        setActiveJob("");
         if (!job.response) throw new Error("Completed job has no response.");
-        showResult(job.response, started);
+        settle(id, { phase: "succeeded", reply: job.response });
         return;
       }
       if (job.status === "failed") {
-        sessionStorage.removeItem(jobStorageKey);
-        setActiveJob("");
-        setBadge({ kind: "err", text: "failed" });
-        setChips([["error", job.error?.code || "unknown"]]);
-        setOutput(JSON.stringify(job.error, null, 2));
+        settle(id, {
+          phase: "failed",
+          error: job.error ?? {
+            code: "unknown",
+            message: "The job failed without an error message.",
+          },
+        });
         return;
       }
-      setBadge({ kind: "running", text: job.status });
+      update(id, { phase: job.status });
     }
   }
-  function reportFailure(cause: unknown) {
+  function fail(id: string, cause: unknown) {
     if (cause instanceof DOMException && cause.name === "AbortError") {
-      setBadge({ kind: "", text: "polling stopped" });
-      setOutput(
-        activeJob()
-          ? `Polling stopped. Job ${activeJob()} keeps running.`
-          : "Submission stopped.",
-      );
-    } else {
-      setBadge({ kind: "err", text: "failed" });
-      setOutput(cause instanceof Error ? cause.message : String(cause));
+      const jobId = list.find((run) => run.id === id)?.jobId;
+      settle(id, {
+        phase: "stopped",
+        error: {
+          code: "polling_stopped",
+          message: jobId
+            ? `Polling stopped. Job ${jobId} keeps running on the server.`
+            : "Stopped before the job was submitted.",
+        },
+      });
+      return;
     }
+    settle(id, {
+      phase: "failed",
+      error: {
+        code: "request_failed",
+        message: cause instanceof Error ? cause.message : String(cause),
+      },
+    });
   }
-  async function submit(form: FormData) {
-    if (busy()) return;
-    const started = performance.now();
+  async function track(
+    id: string,
+    work: (signal: AbortSignal) => Promise<void>,
+  ) {
     controller = new AbortController();
     setBusy(true);
-    setBadge({ kind: "running", text: "submitting" });
-    setChips([]);
-    setOutput("Submitting job…");
-    startTimer(started);
+    setNow(Date.now());
+    clock = setInterval(() => setNow(Date.now()), 100);
     try {
-      const job = await api.submit(form, controller.signal);
-      if (!/^[0-9a-f-]{36}$/.test(job.id))
-        throw new Error("Job submission returned no valid ID.");
-      await pollJob(job.id, controller.signal, started);
+      await work(controller.signal);
     } catch (cause) {
-      reportFailure(cause);
+      fail(id, cause);
     } finally {
-      stopTimer();
+      clearInterval(clock);
+      clock = undefined;
       setBusy(false);
       controller = null;
     }
+  }
+
+  async function submit(request: RunRequest) {
+    if (controller) return;
+    const id = crypto.randomUUID();
+    const startedAt = Date.now();
+    add({
+      id,
+      jobId: "",
+      phase: "submitting",
+      startedAt,
+      durationMs: null,
+      instruction: request.instruction,
+      settings: request.settings,
+      image: {
+        url: URL.createObjectURL(request.image),
+        name: request.image.name || "pasted image",
+      },
+      reply: null,
+      error: null,
+    });
+    await track(id, async (signal) => {
+      const job = await api.submit(request.form, signal);
+      if (!jobIdPattern.test(job.id))
+        throw new Error("Job submission returned no valid ID.");
+      update(id, { jobId: job.id, phase: job.status });
+      const saved: SavedJob = {
+        jobId: job.id,
+        startedAt,
+        instruction: request.instruction,
+        settings: request.settings,
+      };
+      sessionStorage.setItem(jobStorageKey, JSON.stringify(saved));
+      await poll(id, job.id, signal);
+    });
   }
   function cancel() {
     controller?.abort();
     sessionStorage.removeItem(jobStorageKey);
   }
+  function clearHistory() {
+    for (const run of list)
+      if (!isActive(run) && run.image) URL.revokeObjectURL(run.image.url);
+    commit(list.filter(isActive));
+  }
+
   onSettled(() => {
-    const saved = sessionStorage.getItem(jobStorageKey);
-    if (saved && /^[0-9a-f-]{36}$/.test(saved)) {
-      const started = performance.now();
-      controller = new AbortController();
-      setBusy(true);
-      setBadge({ kind: "running", text: "resuming" });
-      startTimer(started);
-      void pollJob(saved, controller.signal, started)
-        .catch(reportFailure)
-        .finally(() => {
-          stopTimer();
-          setBusy(false);
-          controller = null;
-        });
+    const saved = readSavedJob();
+    if (saved) {
+      const id = crypto.randomUUID();
+      add({
+        id,
+        jobId: saved.jobId,
+        phase: "running",
+        startedAt: saved.startedAt,
+        durationMs: null,
+        instruction: saved.instruction,
+        settings: saved.settings,
+        image: null,
+        reply: null,
+        error: null,
+      });
+      void track(id, (signal) => poll(id, saved.jobId, signal));
     }
     return () => {
       controller?.abort();
-      if (timer) clearInterval(timer);
+      if (clock) clearInterval(clock);
+      for (const run of list) if (run.image) URL.revokeObjectURL(run.image.url);
     };
   });
-  return { busy, elapsed, badge, output, chips, submit, cancel };
+
+  return { runs, busy, now, submit, cancel, clearHistory };
 }

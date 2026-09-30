@@ -7,28 +7,29 @@ export function RequestLog(props: {
 }) {
   return (
     <div class="reqlog">
-      <div class="reqlog-head">
-        <span class="name">Request log</span>
-        <button type="button" class="clear-btn" onClick={props.onClear}>
-          clear
-        </button>
-      </div>
       <Show
         when={props.entries.length > 0}
-        fallback={<div class="reqlog-empty">No requests yet.</div>}
+        fallback={<p class="history-empty">No requests yet.</p>}
       >
+        <div class="section-head">
+          <span class="hint">Newest first, last 30 requests.</span>
+          <button type="button" class="link-btn quiet" onClick={props.onClear}>
+            Clear
+          </button>
+        </div>
         <For each={props.entries}>
           {(entry) => (
             <details
-              class={`req ${entry.status === "pending" ? "pending" : entry.status.startsWith("2") ? "" : "err"}`}
+              class={`req ${entry.status === "pending" ? "pending" : entry.status.startsWith("2") ? "ok" : "err"}`}
               open={entry.method === "POST"}
             >
               <summary>
-                <span class="dot" />
+                <span class="lamp" />
                 <span class="meth">{entry.method}</span>
                 <span class="path">{entry.url}</span>
                 <span class="ms">
-                  {entry.status} · {entry.ms}
+                  {entry.status}
+                  {entry.ms ? ` · ${entry.ms}` : ""}
                 </span>
               </summary>
               <pre>
