@@ -89,7 +89,7 @@ export function ImagePicker(props: {
     selectImage(event.dataTransfer?.files[0]);
   }
   function onPaste(event: ClipboardEvent) {
-    const item = [...(event.clipboardData?.items ?? [])].find((entry) =>
+    const item = Array.from(event.clipboardData?.items ?? []).find((entry) =>
       entry.type.startsWith("image/"),
     );
     if (item) selectImage(item.getAsFile());
@@ -121,7 +121,9 @@ export function ImagePicker(props: {
         onClick={() => input.click()}
       >
         <input
-          ref={input}
+          ref={(element) => {
+            input = element;
+          }}
           type="file"
           id="image-input"
           name="image"
@@ -183,7 +185,9 @@ export function ImagePicker(props: {
       </div>
       <dialog
         id="preview-dialog"
-        ref={dialog}
+        ref={(element) => {
+          dialog = element;
+        }}
         onClick={(event) => {
           if (event.target === dialog) dialog.close();
         }}

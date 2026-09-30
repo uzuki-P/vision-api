@@ -5,10 +5,6 @@ import { useScanJob } from "./useScanJob";
 import { ModelControls, type ModelSelection } from "./components/ModelControls";
 import { createApi, type RequestEntry } from "./api";
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export function App() {
   const [apiKey, setApiKey] = createSignal("");
   const [theme, setTheme] = createSignal(

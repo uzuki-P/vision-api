@@ -73,7 +73,7 @@ The scan pipeline uses Effect v4 RC. Both endpoints share the same JSON validati
 
 The API entry point is `server.ts`. HTTP routes and authentication live in `src/http.ts`; `src/input.ts` validates uploads; `src/jobs.ts` stores and schedules jobs. `src/scan.ts` runs the shared Effect workflow. `src/providers.ts` contains the OpenCode and Codex adapters, while `src/cli.ts` handles subprocess limits. `src/env.ts` validates server settings at startup with t3-env and Zod; `src/web-env.ts` validates the playground ports and optional token. The Solid playground lives under `web/`. Its model, image, result, and request log components are in `web/src/components/`, and `web/src/useScanJob.ts` owns submission and polling.
 
-Run `bun run check` for TypeScript and the web build, `bun test` for the slow job and startup validation tests, and `bun run format:check` for formatting.
+Run `bun run check` for Oxlint, TypeScript, and the web build, `bun test` for the slow job and startup validation tests, and `bun run format:check` for formatting. `bun run lint` runs Oxlint's default correctness rules and fails on warnings. `bun run lint:fix` applies safe lint fixes. The shared configuration is `.oxlintrc.json`.
 
 The model must return a JSON object. The API validates and parses it before returning:
 

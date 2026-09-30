@@ -20,7 +20,7 @@ export function RequestLog(props: {
         <For each={props.entries}>
           {(entry) => (
             <details
-              class={`req ${entry.status === "pending" ? "pending" : /^2/.test(entry.status) ? "" : "err"}`}
+              class={`req ${entry.status === "pending" ? "pending" : entry.status.startsWith("2") ? "" : "err"}`}
               open={entry.method === "POST"}
             >
               <summary>
