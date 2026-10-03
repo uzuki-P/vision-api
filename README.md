@@ -2,11 +2,15 @@
 
 A small REST service for sending an instruction and image to OpenCode or Codex CLI. It binds to `127.0.0.1`, requires a bearer token for API calls, and does not keep uploaded images after each request.
 
+## Setup
+
+Follow the [setup guide](docs/setup.md) to install dependencies, authenticate a CLI provider, create a private `.env`, and verify the API and playground. It also covers CLI compatibility, systemd paths, and common startup errors.
+
 ## Service control
 
 The user systemd service runs the API in the background and restarts it after a failure. Bun remains the runtime. OpenCode and Codex use their existing host installations and credentials.
 
-Install the unit once:
+Complete the [setup guide](docs/setup.md#run-as-a-user-service) first. The supplied unit expects this checkout at `~/projects/_sandbox/vision-api` and Bun at `~/.vite-plus/bin/bun`. Install the unit once:
 
 ```sh
 mkdir -p ~/.config/systemd/user
@@ -15,7 +19,7 @@ systemctl --user daemon-reload
 systemctl --user enable --now vision-api
 ```
 
-The unit starts automatically after reboot. Disable it with `systemctl --user disable --now vision-api`.
+The enabled unit starts when your systemd user manager starts, normally at login. Running it before login or after logout requires lingering for your OS account. Disable it with `systemctl --user disable --now vision-api`.
 
 ```sh
 systemctl --user start vision-api
@@ -27,7 +31,7 @@ journalctl --user -u vision-api -f
 
 The unit is linked from `deploy/vision-api.service` under `~/.config/systemd/user/`. After changing `.env`, restart the service. The local `.env` contains the API token and selected port. Keep it private.
 
-Edit `.env` to change the defaults. `DEFAULT_MODEL` and `DEFAULT_REASONING_EFFORT` can stay empty to use the CLI's configured model defaults. OpenCode uses its model variant for reasoning effort. Codex uses `model_reasoning_effort`. Not every model accepts every effort value.
+Edit `.env` to change the defaults. `DEFAULT_MODEL` and `DEFAULT_REASONING_EFFORT` can stay empty to use the CLI's defaults. Codex runs with `--ignore-user-config`, so this endpoint does not load model settings from its user `config.toml`. OpenCode uses its model variant for reasoning effort. Codex uses `model_reasoning_effort`. Not every model accepts every effort value.
 
 You can also select these fields per request. Set `ALLOWED_MODELS` to a comma-separated list before sharing the service if callers should be limited to specific models.
 
