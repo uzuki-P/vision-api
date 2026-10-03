@@ -134,3 +134,7 @@ curl -X POST "https://vision-api.ts.uzuki-p.my.id/v1/analyze" \
 Keep the process bound to `127.0.0.1` and publish it through the private Tailscale route. The API token is a second gate for clients. Do not put it in source control, a URL, or logs. Change it in `.env` to rotate it, then restart the service.
 
 The service ignores forwarded client-IP headers. Restrict tailnet reachability with Tailscale policy where possible, and use the bearer token for service-level authorization. The service also limits concurrent requests and requests per minute. Set `ALLOWED_MODELS` to control which model IDs callers can select.
+
+## License
+
+This project uses the [MIT License](LICENSE).

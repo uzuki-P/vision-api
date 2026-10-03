@@ -1,6 +1,7 @@
 {
   "name": "vision-api",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "start": "bun run server.ts",
