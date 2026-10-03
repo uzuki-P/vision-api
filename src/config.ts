@@ -21,12 +21,14 @@ export const defaultModel = env.DEFAULT_MODEL;
 export const defaultEffort = env.DEFAULT_REASONING_EFFORT;
 export const openCodeBin = env.OPENCODE_BIN;
 export const codexBin = env.CODEX_BIN;
+export const claudeBin = env.CLAUDE_BIN;
 export const allowedModels = new Set(env.ALLOWED_MODELS);
 export const corsOrigins = new Set(env.CORS_ORIGINS);
 
 export function parseProvider(value: string): Provider {
-  if (value === "opencode" || value === "codex") return value;
-  throw new Error("Provider must be opencode or codex");
+  if (value === "opencode" || value === "codex" || value === "claude")
+    return value;
+  throw new Error("Provider must be opencode, codex, or claude");
 }
 
 export function validateModel(model: string): void {

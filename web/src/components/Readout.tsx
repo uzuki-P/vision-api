@@ -20,6 +20,8 @@ function usageChips(run: Run): Array<[string, string]> {
     rows.push(["in", String(usage.input_tokens ?? "?")]);
     if (usage.cached_input_tokens)
       rows.push(["cached", String(usage.cached_input_tokens)]);
+    if (usage.cache_write_input_tokens)
+      rows.push(["cache write", String(usage.cache_write_input_tokens)]);
     rows.push(["out", String(usage.output_tokens ?? "?")]);
     if (usage.reasoning_output_tokens)
       rows.push(["reasoning", String(usage.reasoning_output_tokens)]);

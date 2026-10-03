@@ -242,7 +242,7 @@ export function parseRequestProvider(value: string): Provider {
     throw new HttpError(
       400,
       "invalid_provider",
-      "provider must be opencode or codex",
+      "provider must be opencode, codex, or claude",
     );
   }
 }

@@ -26,7 +26,9 @@ export const env = createEnv({
     MAX_IMAGE_BYTES: integer(12_582_912, 1, 50_000_000),
     MAX_CONCURRENT_REQUESTS: integer(2, 1, 16),
     MAX_REQUESTS_PER_MINUTE: integer(30, 1, 10_000),
-    DEFAULT_PROVIDER: z.enum(["opencode", "codex"]).default("opencode"),
+    DEFAULT_PROVIDER: z
+      .enum(["opencode", "codex", "claude"])
+      .default("opencode"),
     DEFAULT_MODEL: z
       .union([z.literal(""), z.string().regex(modelId)])
       .default(""),
@@ -56,6 +58,7 @@ export const env = createEnv({
     OPENCODE_SOURCE_DATA_DIR: z.string().optional(),
     OPENCODE_BIN: z.string().min(1).default("opencode"),
     CODEX_BIN: z.string().min(1).default("codex"),
+    CLAUDE_BIN: z.string().min(1).default("claude"),
     XDG_DATA_HOME: z.string().optional(),
     HOME: z.string().optional(),
   },

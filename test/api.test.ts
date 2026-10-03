@@ -5,10 +5,12 @@ import path from "node:path";
 
 const token = "12345678901234567890123456789012";
 const workDir = await mkdtemp(path.join(tmpdir(), "vision-api-test-"));
-const providerPath = path.join(workDir, "fake-opencode");
+// A fake Claude Code CLI. The OpenCode adapter needs a running v2 server,
+// while the Claude adapter only reads stream-json lines from stdout.
+const providerPath = path.join(workDir, "fake-claude");
 await writeFile(
   providerPath,
-  '#!/bin/sh\nsleep 2\nprintf \'%s\\n\' \'{"type":"text","part":{"text":"{\\"ok\\":true}"}}\'\n',
+  '#!/bin/sh\ncat >/dev/null\nsleep 2\nprintf \'%s\\n\' \'{"type":"result","is_error":false,"result":"{\\"ok\\":true}"}\'\n',
 );
 await chmod(providerPath, 0o700);
 const port = await new Promise<number>((resolve) => {
@@ -29,7 +31,8 @@ const server = Bun.spawn(["bun", "run", "server.ts"], {
     PORT: String(port),
     REQUEST_TIMEOUT_MS: "1000",
     JOB_TIMEOUT_MS: "10000",
-    OPENCODE_BIN: providerPath,
+    DEFAULT_PROVIDER: "claude",
+    CLAUDE_BIN: providerPath,
     JOB_DATA_DIR: path.join(workDir, "jobs"),
   },
   stdout: "pipe",

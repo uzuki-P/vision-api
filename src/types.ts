@@ -1,4 +1,4 @@
-export type Provider = "opencode" | "codex";
+export type Provider = "opencode" | "codex" | "claude";
 export type ModelChoice = {
   id: string;
   label: string;
