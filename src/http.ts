@@ -42,7 +42,7 @@ export async function handleRequest(request: Request): Promise<Response> {
 
   if (request.method === "GET" && url.pathname === "/v1/providers") {
     return json({
-      providers: ["opencode", "codex"],
+      providers: ["opencode", "codex", "claude"],
       default_provider: defaultProvider,
       default_model: defaultModel || null,
       default_reasoning_effort: defaultEffort || null,

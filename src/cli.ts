@@ -8,11 +8,12 @@ export async function runCli(
   cwd: string,
   timeoutMs: number,
   extraEnv: Record<string, string> = {},
+  stdin?: string,
 ): Promise<{ stdout: string; stderr: string }> {
   const child = Bun.spawn([executable, ...args], {
     cwd,
     env: { ...providerEnvironment(), ...extraEnv },
-    stdin: "ignore",
+    stdin: stdin === undefined ? "ignore" : new TextEncoder().encode(stdin),
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -72,7 +73,7 @@ async function collect(
   return new TextDecoder().decode(bytes);
 }
 
-function providerEnvironment(): Record<string, string> {
+export function providerEnvironment(): Record<string, string> {
   const env: Record<string, string> = {};
   for (const key of [
     "PATH",
@@ -86,6 +87,7 @@ function providerEnvironment(): Record<string, string> {
     "XDG_DATA_HOME",
     "XDG_STATE_HOME",
     "CODEX_HOME",
+    "CLAUDE_CONFIG_DIR",
   ]) {
     const value = process.env[key];
     if (value !== undefined) env[key] = value;

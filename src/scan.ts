@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Cause, Effect, Exit } from "effect";
-import { runCodex, runOpenCode } from "./providers";
+import { runClaude, runCodex, runOpenCode } from "./providers";
 import { HttpError, type ScanInput } from "./types";
 
 export function scanEffect(input: ScanInput, timeoutMs: number) {
@@ -78,6 +78,13 @@ function analyze(input: ScanInput, timeoutMs: number) {
           return yield* Effect.tryPromise({
             try: () =>
               runOpenCode(input, workDir, imagePath, prompt, timeoutMs),
+            catch: (error) => error,
+          });
+        }
+        if (input.provider === "claude") {
+          return yield* Effect.tryPromise({
+            try: () =>
+              runClaude(input, input.image, prompt, workDir, timeoutMs),
             catch: (error) => error,
           });
         }

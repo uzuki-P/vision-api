@@ -4,7 +4,7 @@ Run these commands from the repository root. The API and playground bind to loop
 
 ## Install prerequisites
 
-Install [Bun](https://bun.sh/docs/installation) and [just](https://just.systems/man/en/chapter_4.html). Install at least one CLI backend using the [OpenCode installation instructions](https://opencode.ai/docs/) or the [official Codex CLI instructions](https://developers.openai.com/codex/cli/). The API starts without both CLIs, but requests need the selected backend installed and authenticated.
+Install [Bun](https://bun.sh/docs/installation) and [just](https://just.systems/man/en/chapter_4.html). Install at least one CLI backend using the [OpenCode installation instructions](https://opencode.ai/docs/) the [official Codex CLI instructions](https://developers.openai.com/codex/cli/), or the [Claude Code setup guide](https://code.claude.com/docs/en/setup). The API starts without every CLI, but requests need the selected backend installed and authenticated.
 
 Check your tools and install the locked project dependencies:
 
@@ -21,17 +21,23 @@ Check the selected CLI before proceeding:
 # For OpenCode
 opencode --version
 opencode run --help
-opencode models --help
+opencode serve --help
 
 # For Codex
 codex --version
 codex exec --help
 codex debug models --help
+
+# For Claude Code
+claude --version
+claude --help
 ```
 
-The OpenCode adapter requires `run --pure`, `--format json`, `--agent`, `--file`, `--dir`, and `--variant` when reasoning effort is set. Model discovery requires `models --verbose --pure`. It reads saved provider credentials from `auth.json`. On this host, OpenCode v2.0.22 does not advertise `run --pure` or `--dir`, so it does not satisfy this adapter's command requirements. Use a compatible executable through `OPENCODE_BIN` or select Codex. The repository does not pin or install a CLI version.
+The OpenCode adapter requires OpenCode v2. It uses `serve --stdio --port 0`, the server's `/api/model`, `/api/model/default`, `/api/credential`, and `/api/session` routes, and `run --server --format json --agent --file --model`. Reasoning effort goes in the model reference as `provider/model#variant`. OpenCode v1 is not supported. The repository does not pin or install a CLI version. See [OpenCode v2](../README.md#opencode-v2) for how each request is isolated.
 
 The Codex adapter requires `exec --ephemeral --ignore-user-config --skip-git-repo-check --sandbox read-only --cd --image --output-schema --output-last-message --json`. Model discovery also requires `debug models --bundled`. Check these commands when changing CLI versions.
+
+The Claude Code adapter requires `--print --safe-mode --tools "" --strict-mcp-config --no-session-persistence --system-prompt --input-format stream-json --output-format stream-json --verbose`, plus `--model` and `--effort` when set. It sends the image as a base64 block in a stream-json user message on stdin.
 
 ## Authenticate a provider
 
@@ -41,7 +47,7 @@ Authenticate under the same OS account that will run the API. Follow [OpenCode's
 opencode auth login
 ```
 
-The API looks for OpenCode credentials at `~/.local/share/opencode/auth.json`, or under `$XDG_DATA_HOME/opencode` when configured. If they live elsewhere, set `OPENCODE_SOURCE_DATA_DIR` in `.env` to the directory containing `auth.json`. The adapter copies these credentials into each request's private temporary directory.
+The API reads OpenCode credentials from `~/.local/share/opencode/opencode.db`, or under `$XDG_DATA_HOME/opencode` when configured. If they live elsewhere, set `OPENCODE_SOURCE_DATA_DIR` in `.env` to the directory containing `opencode.db`. The adapter opens the database read-only and adds the credentials to each request's private OpenCode server. Logging in with `opencode auth login` takes effect on the next request without a restart. OpenCode's free-tier models do not work through this service, so log in to at least one provider with image models.
 
 For Codex, use the [documented login commands](https://developers.openai.com/codex/cli/reference/#codex-login):
 
@@ -51,6 +57,8 @@ codex login status
 ```
 
 On a host without a browser, use `codex login --device-auth`. Codex reuses its stored credentials, but this API disables loading its user `config.toml`. Set model and reasoning defaults in this project's `.env` instead.
+
+For Claude Code, sign in once with `claude` and follow the login prompt, or run `claude setup-token` on a host without a browser. The adapter reads credentials from `~/.claude`, or from `CLAUDE_CONFIG_DIR` when set. Requests count against that account's Claude subscription or API usage.
 
 Choose a provider account and model that accept images. Provider credentials authenticate the CLI to its model provider. `API_TOKEN` below authenticates callers to this API and is a separate secret.
 
@@ -72,19 +80,19 @@ This command refuses to overwrite an existing `.env`. If you already have one, e
 
 Review these settings before starting:
 
-| Setting                     | What to configure                                                                                                  |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `DEFAULT_PROVIDER`          | `opencode` by default. Set `codex` if that is your installed backend.                                              |
-| `HOST`                      | Keep `127.0.0.1`. Only `127.0.0.1` and `localhost` pass validation.                                                |
-| `PORT`                      | API port, default `3000`. Choose an unused port.                                                                   |
-| `WEB_PORT`                  | Playground port, default `27182`. Choose a different unused port.                                                  |
-| `API_TOKEN`                 | Random secret of at least 32 characters.                                                                           |
-| `OPENCODE_BIN`, `CODEX_BIN` | Executable names on `PATH`, or absolute paths to compatible CLIs.                                                  |
-| `DEFAULT_MODEL`             | Optional model ID. OpenCode IDs use `provider/model`; Codex uses its model ID.                                     |
-| `DEFAULT_REASONING_EFFORT`  | Optional effort supported by the selected model. Leave empty initially.                                            |
-| `ALLOWED_MODELS`            | Optional comma-separated model IDs. When set, supply an allowed model per request or through `DEFAULT_MODEL`.      |
-| `JOB_DATA_DIR`              | Optional private directory for job data. Defaults to `~/.local/state/vision-api/jobs`.                             |
-| `CORS_ORIGINS`              | Leave empty for the playground proxy. Direct browser clients need exact origins without paths or trailing slashes. |
+| Setting                                   | What to configure                                                                                                             |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `DEFAULT_PROVIDER`                        | `opencode` by default. Set `codex` or `claude` if that is your installed backend.                                             |
+| `HOST`                                    | Keep `127.0.0.1`. Only `127.0.0.1` and `localhost` pass validation.                                                           |
+| `PORT`                                    | API port, default `3000`. Choose an unused port.                                                                              |
+| `WEB_PORT`                                | Playground port, default `27182`. Choose a different unused port.                                                             |
+| `API_TOKEN`                               | Random secret of at least 32 characters.                                                                                      |
+| `OPENCODE_BIN`, `CODEX_BIN`, `CLAUDE_BIN` | Executable names on `PATH`, or absolute paths to compatible CLIs.                                                             |
+| `DEFAULT_MODEL`                           | Optional model ID. OpenCode IDs use `provider/model`; Codex uses its model ID; Claude Code accepts an alias or full model ID. |
+| `DEFAULT_REASONING_EFFORT`                | Optional effort supported by the selected model. Leave empty initially.                                                       |
+| `ALLOWED_MODELS`                          | Optional comma-separated model IDs. When set, supply an allowed model per request or through `DEFAULT_MODEL`.                 |
+| `JOB_DATA_DIR`                            | Optional private directory for job data. Defaults to `~/.local/state/vision-api/jobs`.                                        |
+| `CORS_ORIGINS`                            | Leave empty for the playground proxy. Direct browser clients need exact origins without paths or trailing slashes.            |
 
 The remaining limits and timeout settings are documented in [.env.example](../.env.example). Completed job results persist for 24 hours by default. Choose a job directory writable by the service account.
 
@@ -145,15 +153,15 @@ The service starts with your systemd user manager, normally at login. If it must
 
 ## Troubleshooting
 
-| Symptom                                        | Check                                                                                                                                  |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Startup rejects `API_TOKEN`                    | Replace the example placeholder with a secret at least 32 characters long.                                                             |
-| The port is already in use                     | Check for an existing API or playground process. Reuse it or choose another port.                                                      |
-| HTTP 401                                       | Use the same `API_TOKEN` as the running API. Restart processes after rotating it.                                                      |
-| Playground returns `upstream_unreachable`      | Start the API and match the playground's `PORT` to the API's port.                                                                     |
-| CLI is missing or rejects a flag               | Check its help output and set the appropriate executable path. OpenCode v2 command changes can make it incompatible with this adapter. |
-| OpenCode model listing cannot read credentials | Authenticate as the service account and check `OPENCODE_SOURCE_DATA_DIR` or `XDG_DATA_HOME`.                                           |
-| Model listing works but scans fail             | Check provider login, image support, model access, and any reasoning effort override.                                                  |
-| systemd cannot start Bun or the CLI            | Check the unit's executable paths and `PATH`, then inspect `journalctl --user -u vision-api`.                                          |
+| Symptom                                        | Check                                                                                                                                          |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Startup rejects `API_TOKEN`                    | Replace the example placeholder with a secret at least 32 characters long.                                                                     |
+| The port is already in use                     | Check for an existing API or playground process. Reuse it or choose another port.                                                              |
+| HTTP 401                                       | Use the same `API_TOKEN` as the running API. Restart processes after rotating it.                                                              |
+| Playground returns `upstream_unreachable`      | Start the API and match the playground's `PORT` to the API's port.                                                                             |
+| CLI is missing or rejects a flag               | Check its help output and set the appropriate executable path. The OpenCode adapter needs v2, and later v2 releases may change its server API. |
+| OpenCode model listing cannot read credentials | Authenticate as the service account and check that `opencode.db` exists in `OPENCODE_SOURCE_DATA_DIR` or `$XDG_DATA_HOME/opencode`.            |
+| Model listing works but scans fail             | Check provider login, image support, model access, and any reasoning effort override.                                                          |
+| systemd cannot start Bun or the CLI            | Check the unit's executable paths and `PATH`, then inspect `journalctl --user -u vision-api`.                                                  |
 
 For development checks, run `bun run check`, `bun test`, and `bun run format:check` from the repository root. See the [access control notes](../README.md#access-control) before exposing the API or playground through a private route.
